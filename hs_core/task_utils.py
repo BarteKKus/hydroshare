@@ -5,8 +5,6 @@ from django.conf import settings
 from django.db import transaction
 
 from hs_core.models import TaskNotification
-from hs_core.hydroshare.utils import get_resource_by_shortkey
-from hs_core.signals import post_delete_resource
 
 import logging
 
@@ -182,13 +180,6 @@ def get_task_by_id(task_id, name='', payload='', request=None):
             status = dict(TaskNotification.TASK_STATUS_CHOICES)['completed']
             if not payload:
                 payload = ret_value
-            if name == "resource delete" and request:
-                res = get_resource_by_shortkey(ret_value)
-                res_title = res.metadata.title
-                res_type = res.resource_type
-                post_delete_resource.send(sender=type(res), request=request, user=request.user,
-                                          resource_shortkey=ret_value, resource=res,
-                                          resource_title=res_title, resource_type=res_type)
             create_task_notification(task_id=task_id, status='completed', name=name, payload=payload, username=username)
         # use the Broad scope Exception to catch all exception types since this function can be used for all tasks
         except Exception:

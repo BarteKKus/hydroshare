@@ -713,7 +713,7 @@ def delete_resource(request, shortkey, *args, **kwargs):
     res, _, user = authorize(request, shortkey, needed_permission=ACTION_TO_AUTHORIZE.DELETE_RESOURCE)
     task_id = get_resource_delete_task(shortkey)
     if not task_id:
-        task = delete_resource_task.apply_async((shortkey, user.username))
+        task = delete_resource_task.apply_async((shortkey, request), serializer='pickle')
         task_id = task.task_id
         task_dict = get_task_by_id(task_id, name='resource delete', payload=shortkey, request=request)
         create_task_notification(task_id, name='resource delete', payload=shortkey, username=user.username)

@@ -30,6 +30,7 @@ from django_irods.storage import IrodsStorage
 from theme.models import UserQuota, QuotaMessage, UserProfile, User
 from hs_collection_resource.models import CollectionDeletedResource
 from django_irods.icommands import SessionException
+from hs_core.signals import post_delete_resource
 
 from hs_core.models import BaseResource
 from theme.utils import get_quota_message
@@ -474,8 +475,8 @@ def create_bag_by_irods(resource_id, request_username=None):
         raise ObjectDoesNotExist('Resource {} does not exist.'.format(resource_id))
 
 
-@shared_task
-def delete_resource_task(resource_id, request_username=None):
+@shared_task(serializer='pickle')
+def delete_resource_task(resource_id, request=None):
     """Delete a resource
     :param
     resource_id: the resource uuid that is used to look for the resource to delete.
@@ -514,19 +515,23 @@ def delete_resource_task(resource_id, request_username=None):
 
         res.delete()
 
-        if request_username:
+        if request and request.user:
             # if the deleted resource is part of any collection resource, then for each of those collection
             # create a CollectionDeletedResource object which can then be used to list collection deleted
             # resources on collection resource landing page
             for collection_res in resource_related_collections:
                 o = CollectionDeletedResource.objects.create(
                     resource_title=res_title,
-                    deleted_by=User.objects.get(username=request_username),
+                    deleted_by=request.user,
                     resource_id=resource_id,
                     resource_type=res_type,
                     collection=collection_res
                     )
                 o.resource_owners.add(*owners_list)
+
+    post_delete_resource.send(sender=type(res), request=request, user=request.user,
+                              resource_shortkey=resource_id, resource=res,
+                              resource_title=res_title, resource_type=res_type)
 
     # return the page URL to redirect to after resource deletion task is complete
     return '/my-resources/'
